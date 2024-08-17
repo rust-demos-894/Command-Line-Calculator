@@ -1,14 +1,26 @@
 use std::env;
-use std::io;
+use std::io::{self, Write};
 use regex::Regex;
+
+macro_rules! println_with_prompt {
+    ($condition: expr, $($arg:tt)*) => {
+        {
+            if $condition {
+                print!("calculator >>");
+            }
+            println!($($arg)*);
+        }
+    }
+}
 
 macro_rules! print_with_prompt {
     ($condition: expr, $($arg:tt)*) => {
         {
             if $condition {
-                print!("calculator>");
+                print!("calculator >>");
             }
-            println!($($arg)*);
+            print!($($arg)*);
+            io::stdout().flush().unwrap();
         }
     }
 }
@@ -53,7 +65,8 @@ impl Application {
     fn run(&self) {
         loop {
             let mut equation = String::new();
-    
+            
+            print_with_prompt!(self.config.enable_prompt, "");
             io::stdin()
                 .read_line(&mut equation)
                 .expect("fail to read line.");
@@ -63,8 +76,8 @@ impl Application {
     
             let res = calculate(&equation);
             match res {
-                Ok(num) => print_with_prompt!(self.config.enable_prompt, "{num}"),
-                Err(_) => print_with_prompt!(self.config.enable_prompt, "invalid input: {equation}") 
+                Ok(num) => println_with_prompt!(self.config.enable_prompt, "{num}"),
+                Err(_) => println_with_prompt!(self.config.enable_prompt, "invalid input: {equation}") 
             }
         }
     }
@@ -102,6 +115,10 @@ fn calculate(input: &String) -> Result<i32, ()> {
         Ok(res) => rpn = res,
         Err(_) => return Err(())
     }
+
+    //**************
+    //dbg!(&rpn.stack);
+    //**************
 
     for unit in rpn.stack {
         match unit {
@@ -173,7 +190,11 @@ fn convert(input: &String) -> Result<Stack, &'static str> {
         tokens.push(cap[0].to_string());
     }
 
-    stack.push_str(tokens.pop().ok_or("no numbers or operators matched")?);
+    //stack.push_str(tokens.pop().ok_or("no numbers or operators matched")?);
+
+    //************** */
+    //dbg!(&tokens);
+    //************** */
 
     for token in tokens {//history like: [None, Some("(")].contains(&stack.last().map(|s| s.as_str()))
         match token.as_str() {
@@ -185,8 +206,8 @@ fn convert(input: &String) -> Result<Stack, &'static str> {
             },
 
             "*"|"/" => {
-                while [Some(&CalUnit::Operator(Operator::Plus)), 
-                Some(&CalUnit::Operator(Operator::Sub))]
+                while [Some(&CalUnit::Operator(Operator::Mul)), 
+                Some(&CalUnit::Operator(Operator::Div))]
                 .contains(&stack.last()) {
                     ret.push(stack.pop().unwrap());
                 }
@@ -199,7 +220,9 @@ fn convert(input: &String) -> Result<Stack, &'static str> {
                 while stack.last() != Some(&CalUnit::Operator(Operator::LeftBracket)) {
                     ret.push(stack.pop().unwrap());
                 }
+                stack.pop();
             },
+
             _ => ret.push_str(token),
         }
     }
